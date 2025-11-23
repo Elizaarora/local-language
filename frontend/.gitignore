@@ -32,4 +32,7 @@ __pycache__/
 *.pyc
 backend/integrator/ 
 *.env
-*.json
+# *.json
+# Ignore only sensitive JSONs
+firebase-credentials-local-language.json
+*.secret.json

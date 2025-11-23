@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAuthStore from '../store/authStore';
 import useChatStore from '../store/chatStore';
-import { Languages, LogOut, MessageSquare, Plus, User } from 'lucide-react';
+import api, { authAPI } from '../services/api';
+import { Languages, LogOut, MessageSquare, Plus, User, RefreshCw } from 'lucide-react';
 
 export default function Home() {
   const { user, logout } = useAuthStore();
@@ -10,12 +11,45 @@ export default function Home() {
   const navigate = useNavigate();
   const [showNewChat, setShowNewChat] = useState(false);
   const [partnerEmail, setPartnerEmail] = useState('');
+  const [conversations, setConversations] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [partners, setPartners] = useState({});
 
   useEffect(() => {
     if (!user) {
       navigate('/login');
+    } else {
+      loadUserConversations();
     }
   }, [user, navigate]);
+
+  const loadUserConversations = async () => {
+    if (!user) return;
+    
+    setLoading(true);
+    try {
+      const response = await api.get(`/chat/conversations/user/${user.id}`);
+      setConversations(response.data);
+      
+      // Load partner info for each conversation
+      for (const conv of response.data) {
+        const partnerId = conv.participant1_id === user.id 
+          ? conv.participant2_id 
+          : conv.participant1_id;
+        
+        try {
+          const partnerData = await authAPI.getUserById(partnerId);
+          setPartners(prev => ({ ...prev, [partnerId]: partnerData }));
+        } catch (error) {
+          console.error('Error loading partner:', error);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading conversations:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogout = () => {
     logout();
@@ -24,11 +58,23 @@ export default function Home() {
 
   const handleStartChat = async () => {
     if (partnerEmail.trim()) {
-      // For demo, we'll use a mock partner ID
-      // In production, you'd search for the user by email first
-      const conversation = await createConversation(user.id, 'partner-id');
-      if (conversation) {
-        navigate(`/chat/${conversation.id}`);
+      try {
+        // Search for the partner by email
+        const partner = await authAPI.searchUser(partnerEmail);
+        
+        // Create conversation with real partner ID
+        const conversation = await createConversation(user.id, partner.id);
+        
+        if (conversation) {
+          setShowNewChat(false);
+          setPartnerEmail('');
+          // Refresh conversations list
+          await loadUserConversations();
+          // Navigate to new chat
+          navigate(`/chat/${conversation.id}`);
+        }
+      } catch (error) {
+        alert(error.response?.data?.detail || 'User not found. Please check the email.');
       }
     }
   };
@@ -70,7 +116,85 @@ export default function Home() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* My Conversations Section */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-3xl font-bold">My Conversations</h2>
+            <button
+              onClick={loadUserConversations}
+              disabled={loading}
+              className="flex items-center space-x-2 px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg transition-all"
+            >
+              <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+              <span>Refresh</span>
+            </button>
+          </div>
+
+          {loading && conversations.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading conversations...</p>
+            </div>
+          ) : conversations.length === 0 ? (
+            <div className="bg-white rounded-2xl shadow-xl p-12 text-center">
+              <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <MessageSquare className="w-10 h-10 text-gray-400" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-700 mb-2">No conversations yet</h3>
+              <p className="text-gray-500 mb-6">Start a new conversation to begin chatting!</p>
+              <button
+                onClick={() => setShowNewChat(true)}
+                className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all"
+              >
+                Start Your First Chat
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {conversations.map((conv) => {
+                const partnerId = conv.participant1_id === user.id 
+                  ? conv.participant2_id 
+                  : conv.participant1_id;
+                const partner = partners[partnerId];
+
+                return (
+                  <div
+                    key={conv.id}
+                    onClick={() => navigate(`/chat/${conv.id}`)}
+                    className="bg-white rounded-2xl shadow-xl p-6 hover:shadow-2xl transform hover:scale-105 transition-all cursor-pointer"
+                  >
+                    <div className="flex items-center space-x-4 mb-4">
+                      <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-xl">
+                        {partner ? partner.name[0].toUpperCase() : '?'}
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-bold text-lg">
+                          {partner ? partner.name : 'Loading...'}
+                        </h3>
+                        <p className="text-sm text-gray-500">
+                          {partner ? `Speaks ${partner.preferred_language}` : '...'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="border-t pt-4">
+                      <p className="text-xs text-gray-500">
+                        {conv.last_message_at 
+                          ? `Last message: ${new Date(conv.last_message_at).toLocaleString()}`
+                          : 'No messages yet'}
+                      </p>
+                    </div>
+                    <button className="w-full mt-4 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all">
+                      Open Chat
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Start New Conversation Card */}
           <div className="bg-white rounded-2xl shadow-xl p-8 text-center hover:shadow-2xl transition-all">
             <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-r from-green-400 to-blue-500 rounded-full mb-4">
@@ -97,12 +221,12 @@ export default function Home() {
             <p className="text-gray-600 mb-6">
               Make a voice call with live translation
             </p>
-            <button className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 rounded-lg font-semibold hover:shadow-lg transform hover:scale-105 transition-all">
-              Start Call
+            <button className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 rounded-lg font-semibold hover:shadow-lg transform hover:scale-105 transition-all opacity-50 cursor-not-allowed">
+              Coming Soon
             </button>
           </div>
 
-          {/* Recent Conversations Card */}
+          {/* Profile Card */}
           <div className="bg-white rounded-2xl shadow-xl p-8 text-center hover:shadow-2xl transition-all">
             <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-r from-purple-400 to-pink-500 rounded-full mb-4">
               <User className="w-10 h-10 text-white" />
@@ -111,8 +235,8 @@ export default function Home() {
             <p className="text-gray-600 mb-6">
               View and edit your profile settings
             </p>
-            <button className="w-full bg-gradient-to-r from-purple-500 to-pink-600 text-white py-3 rounded-lg font-semibold hover:shadow-lg transform hover:scale-105 transition-all">
-              View Profile
+            <button className="w-full bg-gradient-to-r from-purple-500 to-pink-600 text-white py-3 rounded-lg font-semibold hover:shadow-lg transform hover:scale-105 transition-all opacity-50 cursor-not-allowed">
+              Coming Soon
             </button>
           </div>
         </div>
@@ -124,17 +248,17 @@ export default function Home() {
             <div className="text-center">
               <div className="text-4xl mb-2">🗣️</div>
               <p className="font-semibold">Voice Translation</p>
-              <p className="text-sm text-gray-600">Real-time speech</p>
+              <p className="text-sm text-gray-600">Coming soon</p>
             </div>
             <div className="text-center">
               <div className="text-4xl mb-2">💬</div>
               <p className="font-semibold">Text Chat</p>
-              <p className="text-sm text-gray-600">Instant messaging</p>
+              <p className="text-sm text-gray-600">Live now!</p>
             </div>
             <div className="text-center">
               <div className="text-4xl mb-2">🎙️</div>
               <p className="font-semibold">Voice Messages</p>
-              <p className="text-sm text-gray-600">Send & receive</p>
+              <p className="text-sm text-gray-600">Coming soon</p>
             </div>
             <div className="text-center">
               <div className="text-4xl mb-2">🇮🇳</div>
@@ -157,19 +281,25 @@ export default function Home() {
               type="email"
               value={partnerEmail}
               onChange={(e) => setPartnerEmail(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleStartChat()}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-6"
               placeholder="partner@email.com"
+              autoFocus
             />
             <div className="flex space-x-4">
               <button
-                onClick={() => setShowNewChat(false)}
+                onClick={() => {
+                  setShowNewChat(false);
+                  setPartnerEmail('');
+                }}
                 className="flex-1 px-6 py-3 border border-gray-300 rounded-lg font-semibold hover:bg-gray-100 transition-all"
               >
                 Cancel
               </button>
               <button
                 onClick={handleStartChat}
-                className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all"
+                disabled={!partnerEmail.trim()}
+                className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Start Chat
               </button>

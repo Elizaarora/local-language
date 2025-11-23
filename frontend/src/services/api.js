@@ -30,6 +30,16 @@ export const authAPI = {
     const response = await api.post('/auth/login', credentials);
     return response.data;
   },
+
+  searchUser: async (email) => {
+    const response = await api.get(`/auth/search/${email}`);
+    return response.data;
+  },
+
+  getUserById: async (userId) => {
+    const response = await api.get(`/auth/user/${userId}`);
+    return response.data;
+  },
 };
 
 // Chat API

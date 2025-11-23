@@ -40,9 +40,24 @@ const useChatStore = create((set, get) => ({
   },
 
   addMessage: (message) => {
-    set((state) => ({
-      messages: [...state.messages, message],
-    }));
+    set((state) => {
+      // Check if message already exists (by ID or by timestamp+text)
+      const exists = state.messages.some(
+        (m) => 
+          m.id === message.id || 
+          (m.text === message.text && 
+          m.sender_id === message.sender_id && 
+          Math.abs(new Date(m.timestamp) - new Date(message.timestamp)) < 1000)
+      );
+      
+      if (exists) {
+        return state; // Don't add duplicate
+      }
+      
+      return {
+        messages: [...state.messages, message],
+      };
+    });
   },
 
   sendMessage: async (messageData) => {

@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     PORT: int = 8000
     
     # Firebase
-    FIREBASE_CREDENTIALS_PATH: str = "firebase-credentials.json"
+    FIREBASE_CREDENTIALS_PATH: str = "firebase-credentials-local-language.json"
     
     # JWT
     JWT_SECRET: str = "your-super-secret-key-change-this"

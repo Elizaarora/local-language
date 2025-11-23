@@ -6,7 +6,7 @@ import os
 class FirebaseService:
     def __init__(self):
         # Initialize Firebase Admin
-        cred_path = os.path.join(os.path.dirname(__file__), '../../firebase-credentials.json')
+        cred_path = os.path.join(os.path.dirname(__file__), '../../firebase-credentials-local-language.json')
         
         if not firebase_admin._apps:
             cred = credentials.Certificate(cred_path)

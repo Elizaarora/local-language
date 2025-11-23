@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { authAPI, chatAPI } from '../services/api';
 import useAuthStore from '../store/authStore';
 import useChatStore from '../store/chatStore';
 import socketService from '../services/socket';
@@ -12,6 +13,7 @@ export default function Chat() {
   const { messages, loadMessages, sendMessage, addMessage } = useChatStore();
   const [messageText, setMessageText] = useState('');
   const [isConnected, setIsConnected] = useState(false);
+  const [partner, setPartner] = useState(null);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
@@ -20,25 +22,44 @@ export default function Chat() {
       return;
     }
 
-    // Connect to socket
-    const socket = socketService.connect();
-    setIsConnected(true);
+    const initChat = async () => {
+      // Connect to socket
+      const socket = socketService.connect();
+      setIsConnected(true);
 
-    // Join conversation
-    socketService.joinConversation(conversationId, user.id);
+      // Join conversation
+      socketService.joinConversation(conversationId, user.id);
 
-    // Load existing messages
-    loadMessages(conversationId);
+      // Load conversation details
+      try {
+        const conversation = await chatAPI.getConversation(conversationId);
+        
+        // Load partner info
+        const partnerId = conversation.participant1_id === user.id 
+          ? conversation.participant2_id 
+          : conversation.participant1_id;
+        
+        const partnerData = await authAPI.getUserById(partnerId);
+        setPartner(partnerData);
+      } catch (error) {
+        console.error('Error loading conversation:', error);
+      }
 
-    // Listen for new messages
-    socketService.onNewMessage((data) => {
-      console.log('New message received:', data);
-      addMessage(data);
-    });
+      // Load existing messages
+      loadMessages(conversationId);
 
-    socketService.onJoinedConversation((data) => {
-      console.log('Joined conversation:', data);
-    });
+      // Listen for new messages
+      socketService.onNewMessage((data) => {
+        console.log('New message received:', data);
+        addMessage(data);
+      });
+
+      socketService.onJoinedConversation((data) => {
+        console.log('Joined conversation:', data);
+      });
+    };
+
+    initChat();
 
     return () => {
       socketService.disconnect();
@@ -57,19 +78,26 @@ export default function Chat() {
         sender_id: user.id,
         text: messageText,
         language: user.preferred_language,
-        translated_language: 'english', // Will be dynamic based on partner's language
+        translated_language: partner?.preferred_language || 'english',
       };
 
-      // Send via API
-      await sendMessage(messageData);
-
-      // Send via socket for real-time update
-      socketService.sendMessage({
-        ...messageData,
-        timestamp: new Date().toISOString(),
-      });
-
+      // Clear input immediately
       setMessageText('');
+
+      try {
+        // Send via API (saves to database)
+        const savedMessage = await sendMessage(messageData);
+        
+        // Send via socket for real-time update
+        socketService.sendMessage({
+          ...savedMessage,
+          timestamp: savedMessage.timestamp || new Date().toISOString(),
+        });
+      } catch (error) {
+        console.error('Error sending message:', error);
+        // Restore message if failed
+        setMessageText(messageData.text);
+      }
     }
   };
 
@@ -95,12 +123,12 @@ export default function Chat() {
               </button>
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold">
-                  P
+                  {partner ? partner.name[0].toUpperCase() : 'P'}
                 </div>
                 <div>
-                  <h3 className="font-semibold">Partner</h3>
+                  <h3 className="font-semibold">{partner ? partner.name : 'Partner'}</h3>
                   <p className="text-xs text-gray-500">
-                    {isConnected ? '🟢 Connected' : '🔴 Disconnected'}
+                    {partner && `Speaks ${partner.preferred_language}`} • {isConnected ? '🟢 Connected' : '🔴 Disconnected'}
                   </p>
                 </div>
               </div>
@@ -131,7 +159,7 @@ export default function Chat() {
             {messages.map((msg, index) => {
               const isSender = msg.sender_id === user?.id;
               return (
-                <div key={index} className={`flex ${isSender ? 'justify-end' : 'justify-start'}`}>
+                <div key={msg.id || index} className={`flex ${isSender ? 'justify-end' : 'justify-start'}`}>
                   <div
                     className={`max-w-md rounded-2xl p-4 shadow-md ${
                       isSender

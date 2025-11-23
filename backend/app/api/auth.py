@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from ..models.user import UserCreate, UserLogin, Token
 from ..services.auth_service import auth_service
+from ..services.firebase_service import firebase_service
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -28,3 +29,33 @@ async def login(login_data: UserLogin):
 async def test_auth():
     """Test authentication endpoint"""
     return {"message": "Auth API is working!"}
+
+@router.get("/search/{email}")
+async def search_user(email: str):
+    """Search for a user by email"""
+    user = await firebase_service.get_user_by_email(email)
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return {
+        "id": user.get('id'),
+        "name": user.get('name'),
+        "email": user.get('email'),
+        "preferred_language": user.get('preferred_language')
+    }
+
+@router.get("/user/{user_id}")
+async def get_user(user_id: str):
+    """Get user by ID"""
+    user = await firebase_service.get_user_by_id(user_id)
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return {
+        "id": user.get('id'),
+        "name": user.get('name'),
+        "email": user.get('email'),
+        "preferred_language": user.get('preferred_language')
+    }

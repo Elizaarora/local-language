@@ -1,4 +1,3 @@
-from typing import Optional
 from langdetect import detect
 import time
 
@@ -18,6 +17,25 @@ class TranslationService:
             'odia': 'or',
             'english': 'en'
         }
+        
+        # Mock translations for demo
+        self.mock_translations = {
+            'hello': {
+                'hindi': 'नमस्ते',
+                'tamil': 'வணக்கம்',
+                'english': 'Hello'
+            },
+            'how are you': {
+                'hindi': 'आप कैसे हैं',
+                'tamil': 'நீங்கள் எப்படி இருக்கிறீர்கள்',
+                'english': 'How are you'
+            },
+            'good morning': {
+                'hindi': 'सुप्रभात',
+                'tamil': 'காலை வணக்கம்',
+                'english': 'Good morning'
+            }
+        }
     
     def detect_language(self, text: str) -> str:
         """Detect language from text"""
@@ -32,19 +50,20 @@ class TranslationService:
     
     async def translate_text(self, text: str, source_lang: str, target_lang: str) -> str:
         """
-        Translate text from source to target language
-        For now, this is a mock function. We'll integrate Google Translate API later.
+        Mock translation for free tier
+        In production, you would use Google Cloud Translation API
         """
         try:
-            # Mock translation for testing
-            # In production, we'll use Google Cloud Translation API
+            # If same language, return original
+            if source_lang == target_lang:
+                return text
             
-            print(f"Translating: '{text}' from {source_lang} to {target_lang}")
+            # Check for mock translations
+            text_lower = text.lower()
+            if text_lower in self.mock_translations:
+                return self.mock_translations[text_lower].get(target_lang, text)
             
-            # Simulate API delay
-            time.sleep(0.5)
-            
-            # Return mock translation
+            # For demo purposes, just prefix with language
             return f"[Translated to {target_lang}]: {text}"
             
         except Exception as e:
