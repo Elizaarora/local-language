@@ -10,19 +10,21 @@ app = FastAPI(
     description="Real-time translation with sentiment analysis"
 )
 
-# Create Socket.IO server
+# Create Socket.IO server with proper CORS
 sio = socketio.AsyncServer(
     async_mode='asgi',
-    cors_allowed_origins='*'
+    cors_allowed_origins='*',
+    logger=True,
+    engineio_logger=True
 )
 
 # Wrap with Socket.IO
 socket_app = socketio.ASGIApp(sio, app)
 
-# CORS middleware
+# CORS middleware - MUST be after Socket.IO wrap
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -59,7 +61,7 @@ async def health():
 @sio.event
 async def connect(sid, environ):
     print(f"✅ Client connected: {sid}")
-    await sio.emit('connection_response', {'status': 'connected'}, room=sid)
+    await sio.emit('connection_response', {'status': 'connected', 'sid': sid}, room=sid)
 
 @sio.event
 async def disconnect(sid):
@@ -74,7 +76,7 @@ async def user_online(sid, data):
     """Track user online status"""
     user_id = data.get('user_id')
     online_users[sid] = user_id
-    print(f"👤 User {user_id} is online")
+    print(f"👤 User {user_id} is online (sid: {sid})")
     await sio.emit('user_online', {'user_id': user_id})
 
 @sio.event
@@ -104,8 +106,9 @@ async def leave_conversation(sid, data):
 async def send_message(sid, data):
     """Handle real-time message"""
     conversation_id = data.get('conversation_id')
-    await sio.emit('new_message', data, room=conversation_id)
     print(f"📨 Message sent to conversation {conversation_id}")
+    print(f"Message data: {data}")
+    await sio.emit('new_message', data, room=conversation_id)
 
 @sio.event
 async def typing(sid, data):
