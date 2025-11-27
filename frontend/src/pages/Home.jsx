@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import useAuthStore from '../store/authStore';
 import useChatStore from '../store/chatStore';
 import api, { authAPI } from '../services/api';
-import { Languages, LogOut, MessageSquare, Plus, User, RefreshCw } from 'lucide-react';
+import { Languages, LogOut, MessageSquare, Plus, User, RefreshCw, Globe } from 'lucide-react';
 
 export default function Home() {
   const { user, logout } = useAuthStore();
@@ -79,6 +79,26 @@ export default function Home() {
     }
   };
 
+  const getLanguageEmoji = (language) => {
+    const emojiMap = {
+      'hindi': '🇮🇳',
+      'tamil': '🇮🇳',
+      'telugu': '🇮🇳',
+      'bengali': '🇮🇳',
+      'marathi': '🇮🇳',
+      'gujarati': '🇮🇳',
+      'kannada': '🇮🇳',
+      'malayalam': '🇮🇳',
+      'punjabi': '🇮🇳',
+      'odia': '🇮🇳',
+      'english': '🇬🇧',
+      'urdu': '🇵🇰',
+      'assamese': '🇮🇳',
+      'sanskrit': '🇮🇳',
+    };
+    return emojiMap[language?.toLowerCase()] || '🌐';
+  };
+
   if (!user) return null;
 
   return (
@@ -101,7 +121,10 @@ export default function Home() {
             <div className="flex items-center space-x-4">
               <div className="text-right">
                 <p className="text-sm font-medium">{user.email}</p>
-                <p className="text-xs text-gray-500">Language: {user.preferred_language}</p>
+                <p className="text-xs text-gray-500 flex items-center justify-end gap-1">
+                  <span>{getLanguageEmoji(user.preferred_language)}</span>
+                  <span>Language: {user.preferred_language}</span>
+                </p>
               </div>
               <button
                 onClick={handleLogout}
@@ -116,6 +139,22 @@ export default function Home() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-12">
+        {/* Translation Feature Banner */}
+        <div className="mb-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl shadow-xl p-6 text-white">
+          <div className="flex items-center gap-4">
+            <div className="bg-white bg-opacity-20 p-4 rounded-xl">
+              <Globe className="w-8 h-8" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold mb-1">Real-Time Translation</h2>
+              <p className="text-blue-100">
+                Chat in your language ({getLanguageEmoji(user.preferred_language)} {user.preferred_language}), 
+                messages are automatically translated for your partner!
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* My Conversations Section */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">
@@ -171,8 +210,13 @@ export default function Home() {
                         <h3 className="font-bold text-lg">
                           {partner ? partner.name : 'Loading...'}
                         </h3>
-                        <p className="text-sm text-gray-500">
-                          {partner ? `Speaks ${partner.preferred_language}` : '...'}
+                        <p className="text-sm text-gray-500 flex items-center gap-1">
+                          {partner && (
+                            <>
+                              <span>{getLanguageEmoji(partner.preferred_language)}</span>
+                              <span>Speaks {partner.preferred_language}</span>
+                            </>
+                          )}
                         </p>
                       </div>
                     </div>
@@ -253,7 +297,7 @@ export default function Home() {
             <div className="text-center">
               <div className="text-4xl mb-2">💬</div>
               <p className="font-semibold">Text Chat</p>
-              <p className="text-sm text-gray-600">Live now!</p>
+              <p className="text-sm text-green-600 font-semibold">Live now!</p>
             </div>
             <div className="text-center">
               <div className="text-4xl mb-2">🎙️</div>
@@ -262,8 +306,8 @@ export default function Home() {
             </div>
             <div className="text-center">
               <div className="text-4xl mb-2">🇮🇳</div>
-              <p className="font-semibold">10+ Languages</p>
-              <p className="text-sm text-gray-600">Indian languages</p>
+              <p className="font-semibold">14+ Languages</p>
+              <p className="text-sm text-green-600 font-semibold">Supported!</p>
             </div>
           </div>
         </div>
@@ -275,7 +319,7 @@ export default function Home() {
           <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
             <h3 className="text-2xl font-bold mb-4">Start New Conversation</h3>
             <p className="text-gray-600 mb-6">
-              Enter the email of the person you want to chat with
+              Enter the email of the person you want to chat with. Messages will be automatically translated!
             </p>
             <input
               type="email"

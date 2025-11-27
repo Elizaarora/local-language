@@ -68,4 +68,21 @@ export const chatAPI = {
   },
 };
 
+// Translation API
+export const translationAPI = {
+  translate: async (text, targetLanguage, sourceLanguage = null) => {
+    const response = await api.post('/chat/translate', {
+      text,
+      target_language: targetLanguage,
+      source_language: sourceLanguage,
+    });
+    return response.data;
+  },
+
+  getSupportedLanguages: async () => {
+    const response = await api.get('/chat/languages');
+    return response.data;
+  },
+};
+
 export default api;

@@ -13,17 +13,22 @@ export default function Register() {
   const { register, loading, error } = useAuthStore();
   const navigate = useNavigate();
 
+  // Extended list with all supported languages
   const indianLanguages = [
-    { code: 'hindi', name: 'Hindi (हिंदी)' },
-    { code: 'tamil', name: 'Tamil (தமிழ்)' },
-    { code: 'telugu', name: 'Telugu (తెలుగు)' },
-    { code: 'bengali', name: 'Bengali (বাংলা)' },
-    { code: 'marathi', name: 'Marathi (मराठी)' },
-    { code: 'gujarati', name: 'Gujarati (ગુજરાતી)' },
-    { code: 'kannada', name: 'Kannada (ಕನ್ನಡ)' },
-    { code: 'malayalam', name: 'Malayalam (മലയാളം)' },
-    { code: 'punjabi', name: 'Punjabi (ਪੰਜਾਬੀ)' },
-    { code: 'odia', name: 'Odia (ଓଡ଼ିଆ)' },
+    { code: 'english', name: 'English 🇬🇧' },
+    { code: 'hindi', name: 'Hindi (हिंदी) 🇮🇳' },
+    { code: 'tamil', name: 'Tamil (தமிழ்) 🇮🇳' },
+    { code: 'telugu', name: 'Telugu (తెలుగు) 🇮🇳' },
+    { code: 'bengali', name: 'Bengali (বাংলা) 🇮🇳' },
+    { code: 'marathi', name: 'Marathi (मराठी) 🇮🇳' },
+    { code: 'gujarati', name: 'Gujarati (ગુજરાતી) 🇮🇳' },
+    { code: 'kannada', name: 'Kannada (ಕನ್ನಡ) 🇮🇳' },
+    { code: 'malayalam', name: 'Malayalam (മലയാളം) 🇮🇳' },
+    { code: 'punjabi', name: 'Punjabi (ਪੰਜਾਬੀ) 🇮🇳' },
+    { code: 'odia', name: 'Odia (ଓଡ଼ିଆ) 🇮🇳' },
+    { code: 'urdu', name: 'Urdu (اردو) 🇵🇰' },
+    { code: 'assamese', name: 'Assamese (অসমীয়া) 🇮🇳' },
+    { code: 'sanskrit', name: 'Sanskrit (संस्कृतम्) 🇮🇳' },
   ];
 
   const handleChange = (e) => {
@@ -123,6 +128,9 @@ export default function Register() {
                 </option>
               ))}
             </select>
+            <p className="text-xs text-gray-500 mt-1">
+              Messages you receive will be translated to this language
+            </p>
           </div>
 
           <button
@@ -140,6 +148,15 @@ export default function Register() {
             Login here
           </Link>
         </p>
+
+        {/* Supported Languages Info */}
+        <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+          <p className="text-sm text-gray-700 text-center">
+            <span className="font-semibold">14+ Languages Supported</span>
+            <br />
+            <span className="text-xs">English, Hindi, Tamil, Telugu, Bengali, Marathi, Gujarati, Kannada, Malayalam, Punjabi, Odia, Urdu, Assamese, Sanskrit</span>
+          </p>
+        </div>
       </div>
     </div>
   ); 

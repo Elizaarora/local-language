@@ -1,6 +1,7 @@
 import firebase_admin
 from firebase_admin import credentials, firestore, auth
 from typing import Optional, Dict, Any
+from datetime import datetime
 import os
 
 class FirebaseService:
@@ -48,6 +49,16 @@ class FirebaseService:
             print(f"Error getting user: {e}")
             return None
     
+    async def update_user_language(self, user_id: str, language: str) -> bool:
+        try:
+            self.db.collection('users').document(user_id).update({
+                'preferred_language': language
+            })
+            return True
+        except Exception as e:
+            print(f"Error updating user language: {e}")
+            return False
+    
     # Conversation operations
     async def create_conversation(self, conversation_data: Dict[str, Any]) -> Dict[str, Any]:
         try:
@@ -69,6 +80,16 @@ class FirebaseService:
             print(f"Error getting conversation: {e}")
             return None
     
+    async def update_conversation_timestamp(self, conversation_id: str) -> bool:
+        try:
+            self.db.collection('conversations').document(conversation_id).update({
+                'last_message_at': datetime.utcnow()
+            })
+            return True
+        except Exception as e:
+            print(f"Error updating conversation timestamp: {e}")
+            return False
+    
     # Message operations
     async def create_message(self, message_data: Dict[str, Any]) -> Dict[str, Any]:
         try:
@@ -83,7 +104,9 @@ class FirebaseService:
     async def get_messages(self, conversation_id: str, limit: int = 50):
         try:
             messages_ref = self.db.collection('messages')
-            query = messages_ref.where('conversation_id', '==', conversation_id).order_by('timestamp').limit(limit)
+            query = messages_ref.where('conversation_id', '==', conversation_id)\
+                               .order_by('timestamp')\
+                               .limit(limit)
             docs = query.stream()
             
             messages = []

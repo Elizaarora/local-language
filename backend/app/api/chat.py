@@ -82,33 +82,101 @@ async def get_user_conversations(user_id: str):
 
 @router.post("/messages", response_model=Message)
 async def send_message(message_data: MessageCreate):
-    """Send a message with translation"""
-    # Translate message
-    translation = await translation_service.translate_with_detection(
-        message_data.text,
-        message_data.translated_language or 'english'
-    )
-    
-    message = {
-        'conversation_id': message_data.conversation_id,
-        'sender_id': message_data.sender_id,
-        'text': message_data.text,
-        'language': translation['source_language'],
-        'translated_text': translation['translated_text'],
-        'translated_language': translation['target_language'],
-        'timestamp': datetime.utcnow(),
-        'is_voice': False
-    }
-    
-    result = await firebase_service.create_message(message)
-    
-    if not result:
-        raise HTTPException(status_code=500, detail="Failed to send message")
-    
-    return result
+    """Send a message with automatic translation"""
+    try:
+        # Get recipient's preferred language from the conversation
+        conversation = await firebase_service.get_conversation(message_data.conversation_id)
+        
+        if not conversation:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        
+        # Determine recipient
+        recipient_id = conversation['participant2_id'] if conversation['participant1_id'] == message_data.sender_id else conversation['participant1_id']
+        
+        # Get recipient's preferred language
+        recipient = await firebase_service.get_user_by_id(recipient_id)
+        target_language = recipient.get('preferred_language', 'english') if recipient else 'english'
+        
+        # If user specified a translation language, use that
+        if message_data.translated_language:
+            target_language = message_data.translated_language
+        
+        # Translate message with automatic language detection
+        translation_result = await translation_service.translate_with_detection(
+            message_data.text,
+            target_language
+        )
+        
+        # Create message document
+        message = {
+            'conversation_id': message_data.conversation_id,
+            'sender_id': message_data.sender_id,
+            'text': message_data.text,
+            'language': translation_result['source_language'],
+            'translated_text': translation_result['translated_text'],
+            'translated_language': translation_result['target_language'],
+            'timestamp': datetime.utcnow(),
+            'is_voice': False
+        }
+        
+        # Save message to Firebase
+        result = await firebase_service.create_message(message)
+        
+        if not result:
+            raise HTTPException(status_code=500, detail="Failed to send message")
+        
+        # Update conversation's last_message_at
+        await firebase_service.update_conversation_timestamp(message_data.conversation_id)
+        
+        return result
+        
+    except Exception as e:
+        print(f"Error sending message: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/messages/{conversation_id}", response_model=List[Message])
 async def get_messages(conversation_id: str, limit: int = 50):
     """Get messages for a conversation"""
-    messages = await firebase_service.get_messages(conversation_id, limit)
-    return messages
+    try:
+        messages = await firebase_service.get_messages(conversation_id, limit)
+        return messages
+    except Exception as e:
+        print(f"Error getting messages: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/translate")
+async def translate_text(data: dict):
+    """Manual translation endpoint"""
+    try:
+        text = data.get('text')
+        target_lang = data.get('target_language', 'english')
+        source_lang = data.get('source_language')
+        
+        if not text:
+            raise HTTPException(status_code=400, detail="Text is required")
+        
+        if source_lang:
+            # Translate with specified source language
+            translated = await translation_service.translate_text(text, source_lang, target_lang)
+            return {
+                'original_text': text,
+                'source_language': source_lang,
+                'translated_text': translated,
+                'target_language': target_lang
+            }
+        else:
+            # Translate with automatic detection
+            result = await translation_service.translate_with_detection(text, target_lang)
+            return result
+            
+    except Exception as e:
+        print(f"Translation error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/languages")
+async def get_supported_languages():
+    """Get list of supported languages"""
+    return {
+        "languages": list(translation_service.language_map.keys()),
+        "language_codes": translation_service.language_map
+    }
