@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { authAPI, chatAPI, translationAPI } from '../services/api';
+import { authAPI, chatAPI } from '../services/api';
 import useAuthStore from '../store/authStore';
 import useChatStore from '../store/chatStore';
 import socketService from '../services/socket';
-import { Send, Mic, ArrowLeft, Phone, Video, MoreVertical, Languages, Volume2 } from 'lucide-react';
+import VoiceRecorder, { TextToSpeech } from '../components/VoiceRecorder';
+import { Send, ArrowLeft, Phone, Video, MoreVertical, Languages, Smile } from 'lucide-react';
 
 export default function Chat() {
   const { conversationId } = useParams();
@@ -16,7 +17,10 @@ export default function Chat() {
   const [partner, setPartner] = useState(null);
   const [showTranslation, setShowTranslation] = useState(true);
   const [isTranslating, setIsTranslating] = useState(false);
+  const [partnerTyping, setPartnerTyping] = useState(false);
+  const [partnerOnline, setPartnerOnline] = useState(false);
   const messagesEndRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
 
   useEffect(() => {
     if (!user) {
@@ -28,6 +32,9 @@ export default function Chat() {
       // Connect to socket
       const socket = socketService.connect();
       setIsConnected(true);
+
+      // Announce user is online
+      socketService.userOnline(user.id);
 
       // Join conversation
       socketService.joinConversation(conversationId, user.id);
@@ -54,6 +61,31 @@ export default function Chat() {
       socketService.onNewMessage((data) => {
         console.log('New message received:', data);
         addMessage(data);
+        
+        // Mark as read if we're the recipient
+        if (data.sender_id !== user.id) {
+          socketService.markMessageRead(conversationId, data.id, user.id);
+        }
+      });
+
+      // Listen for typing indicators
+      socketService.onUserTyping((data) => {
+        if (data.user_id !== user.id) {
+          setPartnerTyping(data.is_typing);
+        }
+      });
+
+      // Listen for online/offline status
+      socketService.onUserOnline((data) => {
+        if (partner && data.user_id === partner.id) {
+          setPartnerOnline(true);
+        }
+      });
+
+      socketService.onUserOffline((data) => {
+        if (partner && data.user_id === partner.id) {
+          setPartnerOnline(false);
+        }
       });
 
       socketService.onJoinedConversation((data) => {
@@ -66,12 +98,39 @@ export default function Chat() {
     return () => {
       socketService.disconnect();
     };
-  }, [conversationId, user, navigate]);
+  }, [conversationId, user, navigate, partner]);
 
   useEffect(() => {
     // Scroll to bottom when new messages arrive
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Handle typing indicator
+  const handleTyping = (isTyping) => {
+    socketService.sendTyping(conversationId, user.id, isTyping);
+  };
+
+  const handleTextChange = (e) => {
+    setMessageText(e.target.value);
+    
+    // Send typing indicator
+    handleTyping(true);
+    
+    // Clear existing timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    
+    // Set timeout to stop typing indicator
+    typingTimeoutRef.current = setTimeout(() => {
+      handleTyping(false);
+    }, 1000);
+  };
+
+  const handleVoiceTranscript = (transcript) => {
+    setMessageText(prev => prev + ' ' + transcript);
+    handleTyping(true);
+  };
 
   const handleSendMessage = async () => {
     if (messageText.trim()) {
@@ -86,6 +145,7 @@ export default function Chat() {
       // Clear input immediately
       setMessageText('');
       setIsTranslating(true);
+      handleTyping(false);
 
       try {
         // Send via API (saves to database with translation)
@@ -146,8 +206,13 @@ export default function Chat() {
                 <ArrowLeft className="w-6 h-6" />
               </button>
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold">
-                  {partner ? partner.name[0].toUpperCase() : 'P'}
+                <div className="relative">
+                  <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold">
+                    {partner ? partner.name[0].toUpperCase() : 'P'}
+                  </div>
+                  {partnerOnline && (
+                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
+                  )}
                 </div>
                 <div>
                   <h3 className="font-semibold">{partner ? partner.name : 'Partner'}</h3>
@@ -159,7 +224,7 @@ export default function Chat() {
                       </span>
                     )}
                     {' • '}
-                    {isConnected ? '🟢 Connected' : '🔴 Disconnected'}
+                    {partnerOnline ? '🟢 Online' : '⚫ Offline'}
                   </p>
                 </div>
               </div>
@@ -172,10 +237,10 @@ export default function Chat() {
               >
                 <Languages className="w-5 h-5" />
               </button>
-              <button className="p-2 hover:bg-gray-100 rounded-lg transition-all">
+              <button className="p-2 hover:bg-gray-100 rounded-lg transition-all" title="Voice call (coming soon)">
                 <Phone className="w-5 h-5" />
               </button>
-              <button className="p-2 hover:bg-gray-100 rounded-lg transition-all">
+              <button className="p-2 hover:bg-gray-100 rounded-lg transition-all" title="Video call (coming soon)">
                 <Video className="w-5 h-5" />
               </button>
               <button className="p-2 hover:bg-gray-100 rounded-lg transition-all">
@@ -223,12 +288,20 @@ export default function Chat() {
                         : 'bg-white text-gray-900'
                     }`}
                   >
+                    {/* Sentiment Indicator */}
+                    {msg.sentiment_emoji && (
+                      <div className="text-2xl mb-2">{msg.sentiment_emoji}</div>
+                    )}
+
                     {/* Original Message */}
                     <div className="mb-1">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center justify-between gap-2 mb-1">
                         <span className="text-xs opacity-75">
                           {getLanguageEmoji(msg.language)} {msg.language}
                         </span>
+                        {!isSender && (
+                          <TextToSpeech text={msg.text} language={msg.language} />
+                        )}
                       </div>
                       <p className="font-medium">{msg.text}</p>
                     </div>
@@ -240,11 +313,16 @@ export default function Chat() {
                           isSender ? 'border-blue-400 text-blue-100' : 'border-gray-300 text-gray-600'
                         }`}
                       >
-                        <div className="flex items-center gap-2 mb-1">
-                          <Languages className="w-3 h-3" />
-                          <span className="text-xs opacity-75">
-                            {getLanguageEmoji(msg.translated_language)} {msg.translated_language}
-                          </span>
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <div className="flex items-center gap-2">
+                            <Languages className="w-3 h-3" />
+                            <span className="text-xs opacity-75">
+                              {getLanguageEmoji(msg.translated_language)} {msg.translated_language}
+                            </span>
+                          </div>
+                          {isSender && (
+                            <TextToSpeech text={msg.translated_text} language={msg.translated_language} />
+                          )}
                         </div>
                         <p>{msg.translated_text}</p>
                       </div>
@@ -260,11 +338,27 @@ export default function Chat() {
                             })
                           : 'Now'}
                       </span>
+                      {isSender && msg.read && <span className="ml-1">✓✓</span>}
                     </div>
                   </div>
                 </div>
               );
             })}
+            
+            {/* Typing Indicator */}
+            {partnerTyping && (
+              <div className="flex justify-start">
+                <div className="bg-gray-200 rounded-2xl px-4 py-3 flex items-center gap-2">
+                  <div className="flex gap-1">
+                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                  </div>
+                  <span className="text-xs text-gray-600">{partner?.name} is typing...</span>
+                </div>
+              </div>
+            )}
+            
             <div ref={messagesEndRef} />
           </div>
         )}
@@ -284,12 +378,13 @@ export default function Chat() {
       <div className="bg-white border-t shadow-lg">
         <div className="max-w-4xl mx-auto p-4">
           <div className="flex items-end space-x-2">
-            <button className="p-3 hover:bg-gray-100 rounded-lg transition-all" title="Voice message (coming soon)">
-              <Mic className="w-6 h-6 text-gray-600" />
-            </button>
+            <VoiceRecorder 
+              onTranscript={handleVoiceTranscript} 
+              language={user?.preferred_language}
+            />
             <textarea
               value={messageText}
-              onChange={(e) => setMessageText(e.target.value)}
+              onChange={handleTextChange}
               onKeyPress={handleKeyPress}
               placeholder={`Type in ${user?.preferred_language}...`}
               className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
@@ -308,7 +403,7 @@ export default function Chat() {
           </div>
           <p className="text-xs text-gray-500 mt-2 text-center flex items-center justify-center gap-1">
             <Languages className="w-3 h-3" />
-            Messages are automatically translated from {user?.preferred_language} to {partner?.preferred_language || 'partner\'s language'}
+            Messages with sentiment analysis • Voice input available
           </p>
         </div>
       </div>

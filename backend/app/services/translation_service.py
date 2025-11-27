@@ -1,12 +1,10 @@
-from googletrans import Translator
+from deep_translator import GoogleTranslator
 from langdetect import detect
 import asyncio
 from typing import Dict
 
 class TranslationService:
     def __init__(self):
-        self.translator = Translator()
-        
         # Language mapping for display names to codes
         self.language_map = {
             'hindi': 'hi',
@@ -47,7 +45,7 @@ class TranslationService:
     
     async def translate_text(self, text: str, source_lang: str, target_lang: str) -> str:
         """
-        Translate text using googletrans library
+        Translate text using deep-translator (Google Translate API)
         """
         try:
             # Convert language names to codes
@@ -62,10 +60,10 @@ class TranslationService:
             loop = asyncio.get_event_loop()
             translation = await loop.run_in_executor(
                 None,
-                lambda: self.translator.translate(text, src=source_code, dest=target_code)
+                lambda: GoogleTranslator(source=source_code, target=target_code).translate(text)
             )
             
-            return translation.text
+            return translation
             
         except Exception as e:
             print(f"Translation error: {e}")
@@ -106,12 +104,16 @@ class TranslationService:
                 return texts
             
             loop = asyncio.get_event_loop()
-            translations = await loop.run_in_executor(
-                None,
-                lambda: self.translator.translate(texts, src=source_code, dest=target_code)
-            )
+            translations = []
             
-            return [t.text for t in translations]
+            for text in texts:
+                translation = await loop.run_in_executor(
+                    None,
+                    lambda t=text: GoogleTranslator(source=source_code, target=target_code).translate(t)
+                )
+                translations.append(translation)
+            
+            return translations
         except Exception as e:
             print(f"Batch translation error: {e}")
             return texts

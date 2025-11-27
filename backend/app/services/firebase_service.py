@@ -116,6 +116,18 @@ class FirebaseService:
         except Exception as e:
             print(f"Error getting messages: {e}")
             return []
+    
+    async def mark_message_read(self, message_id: str) -> bool:
+        """Mark a message as read"""
+        try:
+            self.db.collection('messages').document(message_id).update({
+                'read': True,
+                'read_at': datetime.utcnow()
+            })
+            return True
+        except Exception as e:
+            print(f"Error marking message read: {e}")
+            return False
 
 # Create singleton instance
 firebase_service = FirebaseService()

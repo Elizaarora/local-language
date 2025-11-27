@@ -4,6 +4,7 @@ from datetime import datetime
 from ..models.message import Message, MessageCreate, Conversation, ConversationCreate
 from ..services.firebase_service import firebase_service
 from ..services.translation_service import translation_service
+from ..services.sentiment_service import sentiment_service
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
@@ -13,7 +14,6 @@ async def create_conversation(conv_data: ConversationCreate):
     try:
         convs_ref = firebase_service.db.collection('conversations')
         
-        # Check if conversation already exists (both directions)
         query1 = convs_ref.where('participant1_id', '==', conv_data.participant1_id)\
                          .where('participant2_id', '==', conv_data.participant2_id)\
                          .limit(1).stream()
@@ -22,14 +22,12 @@ async def create_conversation(conv_data: ConversationCreate):
                          .where('participant2_id', '==', conv_data.participant1_id)\
                          .limit(1).stream()
         
-        # Return existing conversation
         for doc in query1:
             return doc.to_dict()
         
         for doc in query2:
             return doc.to_dict()
         
-        # Create new conversation
         conversation = {
             'participant1_id': conv_data.participant1_id,
             'participant2_id': conv_data.participant2_id,
@@ -64,15 +62,12 @@ async def get_user_conversations(user_id: str):
     try:
         convs_ref = firebase_service.db.collection('conversations')
         
-        # Get conversations where user is participant1
         query1 = convs_ref.where('participant1_id', '==', user_id).stream()
         conversations1 = [doc.to_dict() for doc in query1]
         
-        # Get conversations where user is participant2
         query2 = convs_ref.where('participant2_id', '==', user_id).stream()
         conversations2 = [doc.to_dict() for doc in query2]
         
-        # Combine and remove duplicates
         all_conversations = conversations1 + conversations2
         
         return all_conversations
@@ -80,34 +75,30 @@ async def get_user_conversations(user_id: str):
         print(f"Error getting conversations: {e}")
         return []
 
-@router.post("/messages", response_model=Message)
+@router.post("/messages")
 async def send_message(message_data: MessageCreate):
-    """Send a message with automatic translation"""
+    """Send a message with automatic translation and sentiment analysis"""
     try:
-        # Get recipient's preferred language from the conversation
         conversation = await firebase_service.get_conversation(message_data.conversation_id)
         
         if not conversation:
             raise HTTPException(status_code=404, detail="Conversation not found")
         
-        # Determine recipient
         recipient_id = conversation['participant2_id'] if conversation['participant1_id'] == message_data.sender_id else conversation['participant1_id']
         
-        # Get recipient's preferred language
         recipient = await firebase_service.get_user_by_id(recipient_id)
         target_language = recipient.get('preferred_language', 'english') if recipient else 'english'
         
-        # If user specified a translation language, use that
         if message_data.translated_language:
             target_language = message_data.translated_language
         
-        # Translate message with automatic language detection
         translation_result = await translation_service.translate_with_detection(
             message_data.text,
             target_language
         )
         
-        # Create message document
+        sentiment_result = sentiment_service.analyze_sentiment(message_data.text)
+        
         message = {
             'conversation_id': message_data.conversation_id,
             'sender_id': message_data.sender_id,
@@ -115,17 +106,19 @@ async def send_message(message_data: MessageCreate):
             'language': translation_result['source_language'],
             'translated_text': translation_result['translated_text'],
             'translated_language': translation_result['target_language'],
+            'sentiment': sentiment_result['sentiment'],
+            'sentiment_emoji': sentiment_result['emoji'],
+            'sentiment_score': sentiment_result['polarity'],
             'timestamp': datetime.utcnow(),
-            'is_voice': False
+            'is_voice': False,
+            'read': False
         }
         
-        # Save message to Firebase
         result = await firebase_service.create_message(message)
         
         if not result:
             raise HTTPException(status_code=500, detail="Failed to send message")
         
-        # Update conversation's last_message_at
         await firebase_service.update_conversation_timestamp(message_data.conversation_id)
         
         return result
@@ -134,7 +127,7 @@ async def send_message(message_data: MessageCreate):
         print(f"Error sending message: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/messages/{conversation_id}", response_model=List[Message])
+@router.get("/messages/{conversation_id}")
 async def get_messages(conversation_id: str, limit: int = 50):
     """Get messages for a conversation"""
     try:
@@ -142,6 +135,18 @@ async def get_messages(conversation_id: str, limit: int = 50):
         return messages
     except Exception as e:
         print(f"Error getting messages: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.put("/messages/{message_id}/read")
+async def mark_message_read(message_id: str):
+    """Mark a message as read"""
+    try:
+        success = await firebase_service.mark_message_read(message_id)
+        if success:
+            return {"status": "success", "message_id": message_id}
+        raise HTTPException(status_code=500, detail="Failed to mark message as read")
+    except Exception as e:
+        print(f"Error marking message read: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/translate")
@@ -156,7 +161,6 @@ async def translate_text(data: dict):
             raise HTTPException(status_code=400, detail="Text is required")
         
         if source_lang:
-            # Translate with specified source language
             translated = await translation_service.translate_text(text, source_lang, target_lang)
             return {
                 'original_text': text,
@@ -165,12 +169,30 @@ async def translate_text(data: dict):
                 'target_language': target_lang
             }
         else:
-            # Translate with automatic detection
             result = await translation_service.translate_with_detection(text, target_lang)
             return result
             
     except Exception as e:
         print(f"Translation error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/analyze-sentiment")
+async def analyze_sentiment(data: dict):
+    """Analyze sentiment of text"""
+    try:
+        text = data.get('text')
+        if not text:
+            raise HTTPException(status_code=400, detail="Text is required")
+        
+        result = sentiment_service.analyze_sentiment(text)
+        suggestions = sentiment_service.get_emotion_suggestions(result['sentiment'])
+        
+        return {
+            **result,
+            'suggestions': suggestions
+        }
+    except Exception as e:
+        print(f"Sentiment analysis error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/languages")
