@@ -33,20 +33,32 @@ class FirebaseService:
             docs = query.stream()
             
             for doc in docs:
-                return doc.to_dict()
+                user_data = doc.to_dict()
+                # Ensure document ID is included
+                if user_data and 'id' not in user_data:
+                    user_data['id'] = doc.id
+                return user_data
             return None
         except Exception as e:
             print(f"Error getting user: {e}")
+            import traceback
+            traceback.print_exc()
             return None
    
     async def get_user_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
         try:
             doc = self.db.collection('users').document(user_id).get()
             if doc.exists:
-                return doc.to_dict()
+                user_data = doc.to_dict()
+                # Ensure document ID is included
+                if user_data and 'id' not in user_data:
+                    user_data['id'] = doc.id
+                return user_data
             return None
         except Exception as e:
             print(f"Error getting user: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     async def update_user_language(self, user_id: str, language: str) -> bool:
@@ -128,6 +140,18 @@ class FirebaseService:
         except Exception as e:
             print(f"Error marking message read: {e}")
             return False
+    
+    # Notification operations
+    async def create_notification(self, notification_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a notification"""
+        try:
+            notif_ref = self.db.collection('notifications').document()
+            notification_data['id'] = notif_ref.id
+            notif_ref.set(notification_data)
+            return notification_data
+        except Exception as e:
+            print(f"Error creating notification: {e}")
+            return None
 
 # Create singleton instance
 firebase_service = FirebaseService()

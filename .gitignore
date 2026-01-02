@@ -1,26 +1,60 @@
 # Backend
 backend/firebase-credentials*.json
 backend/.env
+backend/.env.local
+backend/.env.production
 backend/integrator/
-backend/__pycache__/
-backend/*.pyc
 backend/venv/
 backend/env/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/*.pyc
+backend/**/*.pyc
+backend/uploads/
+backend/logs/*.log
 
 # Frontend
 frontend/node_modules/
 frontend/dist/
 frontend/.env
+frontend/.env.local
+frontend/.env.production
 frontend/.vscode/
+frontend/.next/
+frontend/.cache/
+
+# Root
+.env
+.env.local
+.env.production
+.env.*.local
 
 # IDE
 .vscode/
 .idea/
 *.swp
+*.swo
+*~
 
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # Logs
 *.log
+logs/
+*.log.*
+
+# Docker
+.dockerignore
+
+# Testing
+.coverage
+.pytest_cache/
+htmlcov/
+
+# Build artifacts
+*.egg-info/
+dist/
+build/ 

@@ -70,6 +70,20 @@ const useChatStore = create((set, get) => ({
       return null;
     }
   },
+
+  updateMessage: (messageId, updatedMessage) => {
+    set((state) => ({
+      messages: state.messages.map(msg => 
+        msg.id === messageId ? updatedMessage : msg
+      )
+    }));
+  },
+
+  removeMessage: (messageId) => {
+    set((state) => ({
+      messages: state.messages.filter(msg => msg.id !== messageId)
+    }));
+  },
 }));
 
 export default useChatStore;

@@ -3,7 +3,8 @@ from typing import Optional
 from datetime import datetime
 
 class UserBase(BaseModel):
-    email: EmailStr
+    email: Optional[EmailStr] = None
+    phone_number: Optional[str] = None
     name: str
     preferred_language: str = "hindi"
 
@@ -11,7 +12,8 @@ class UserCreate(UserBase):
     password: str
 
 class UserLogin(BaseModel):
-    email: EmailStr
+    email: Optional[EmailStr] = None
+    phone_number: Optional[str] = None
     password: str
 
 class User(UserBase):

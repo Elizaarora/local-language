@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Dict, List
 from datetime import datetime
 
 class MessageBase(BaseModel):
@@ -11,6 +11,8 @@ class MessageBase(BaseModel):
 class MessageCreate(MessageBase):
     conversation_id: str
     sender_id: str
+    file_url: Optional[str] = None
+    file_type: Optional[str] = None
 
 class Message(MessageBase):
     id: str
@@ -19,6 +21,9 @@ class Message(MessageBase):
     timestamp: datetime
     is_voice: bool = False
     voice_url: Optional[str] = None
+    file_url: Optional[str] = None
+    file_type: Optional[str] = None
+    reactions: Optional[Dict[str, List[str]]] = None  # {emoji: [user_ids]}
 
 class ConversationCreate(BaseModel):
     participant1_id: str

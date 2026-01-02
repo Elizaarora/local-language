@@ -65,47 +65,101 @@ class AuthService:
     async def login_user(self, login_data: UserLogin) -> Optional[Token]:
         """Login user"""
         try:
-            print(f"Attempting to login user: {login_data.email}")
+            from ..core.logging_config import logger
+            logger.info(f"Attempting to login user: {login_data.email}")
             
             # Get user from database
             user = await firebase_service.get_user_by_email(login_data.email)
             
             if not user:
-                print(f"User not found: {login_data.email}")
+                logger.warning(f"User not found: {login_data.email}")
                 return None
             
-            print("User found, verifying password...")
+            logger.debug(f"User found: {user.get('email')}, has ID: {bool(user.get('id'))}, has password: {bool(user.get('hashed_password'))}")
+            
+            if not user.get('hashed_password'):
+                logger.error(f"User {login_data.email} has no password hash")
+                return None
+            
+            if not user.get('id'):
+                logger.error(f"User {login_data.email} has no ID")
+                return None
+            
+            logger.debug("User found, verifying password...")
             
             # Verify password
-            if not verify_password(login_data.password, user['hashed_password']):
-                print("Password verification failed")
+            password_valid = verify_password(login_data.password, user['hashed_password'])
+            
+            logger.debug(f"Password verification result: {password_valid}")
+            
+            if not password_valid:
+                logger.warning(f"Password verification failed for user: {login_data.email}")
+                # Log hash for debugging (first 20 chars only)
+                hash_preview = user['hashed_password'][:20] if user.get('hashed_password') else 'None'
+                logger.debug(f"Hash preview: {hash_preview}...")
                 return None
             
-            print("Password verified successfully")
+            logger.info("Password verified successfully")
             
             # Create access token
             access_token = create_access_token(
                 data={"sub": user['email'], "id": user['id']}
             )
             
-            # Remove password from response
-            user_response = User(
-                id=user['id'],
-                email=user['email'],
-                name=user['name'],
-                preferred_language=user['preferred_language'],
-                created_at=user['created_at'],
-                is_active=user['is_active']
-            )
+            # Handle Firestore timestamp conversion
+            created_at = user.get('created_at')
+            if created_at:
+                try:
+                    # If it's a Firestore timestamp, convert it
+                    if hasattr(created_at, 'timestamp'):
+                        created_at = datetime.fromtimestamp(created_at.timestamp())
+                    # If it's already a datetime, use it
+                    elif isinstance(created_at, datetime):
+                        pass
+                    # If it's a timestamp number, convert to datetime
+                    elif isinstance(created_at, (int, float)):
+                        created_at = datetime.fromtimestamp(created_at)
+                    # If it's a string, try to parse it
+                    elif isinstance(created_at, str):
+                        # Try ISO format first
+                        try:
+                            created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                        except:
+                            created_at = datetime.utcnow()
+                    else:
+                        created_at = datetime.utcnow()
+                except Exception as e:
+                    logger.warning(f"Error parsing created_at: {e}, using current time")
+                    created_at = datetime.utcnow()
+            else:
+                created_at = datetime.utcnow()
             
-            print(f"Login successful for user: {user['email']}")
+            # Remove password from response
+            try:
+                user_response = User(
+                    id=user['id'],
+                    email=user['email'],
+                    name=user['name'],
+                    preferred_language=user.get('preferred_language', 'english'),
+                    created_at=created_at,
+                    is_active=user.get('is_active', True)
+                )
+            except Exception as e:
+                logger.error(f"Error creating User response: {e}")
+                logger.error(f"User data: {user}")
+                raise
+            
+            logger.info(f"Login successful for user: {user['email']}")
             
             return Token(
                 access_token=access_token,
                 user=user_response
             )
         except Exception as e:
-            print(f"Login error: {e}")
+            from ..core.logging_config import logger
+            logger.error(f"Login error: {e}", exc_info=True)
+            import traceback
+            traceback.print_exc()
             return None
 
 # Create singleton instance

@@ -14,21 +14,29 @@ pwd_context = CryptContext(
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a plain password against a hashed password"""
     try:
-        # Truncate password to 72 bytes for bcrypt
-        password_bytes = plain_password.encode('utf-8')[:72]
-        return pwd_context.verify(password_bytes.decode('utf-8'), hashed_password)
+        if not plain_password or not hashed_password:
+            return False
+        
+        # Bcrypt automatically handles passwords up to 72 bytes
+        # No need to truncate manually - passlib handles this
+        return pwd_context.verify(plain_password, hashed_password)
     except Exception as e:
         print(f"Password verification error: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 def get_password_hash(password: str) -> str:
     """Hash a password"""
     try:
-        # Truncate password to 72 bytes for bcrypt
-        password_bytes = password.encode('utf-8')[:72]
-        return pwd_context.hash(password_bytes.decode('utf-8'))
+        if not password:
+            raise ValueError("Password cannot be empty")
+        # Passlib automatically handles password length limits
+        return pwd_context.hash(password)
     except Exception as e:
         print(f"Password hashing error: {e}")
+        import traceback
+        traceback.print_exc()
         raise
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):

@@ -11,7 +11,14 @@ const useAuthStore = create((set) => ({
   login: async (credentials) => {
     set({ loading: true, error: null });
     try {
+      console.log('🔐 Attempting login for:', credentials.email);
       const data = await authAPI.login(credentials);
+      console.log('✅ Login response received:', { 
+        hasToken: !!data.access_token, 
+        hasUser: !!data.user,
+        userId: data.user?.id 
+      });
+      
       localStorage.setItem('access_token', data.access_token);
       localStorage.setItem('user', JSON.stringify(data.user));
       
@@ -20,12 +27,21 @@ const useAuthStore = create((set) => ({
         token: data.access_token,
         isAuthenticated: true,
         loading: false,
+        error: null,
       });
       
+      console.log('✅ Login successful, user authenticated');
       return true;
     } catch (error) {
+      const errorMessage = error.response?.data?.detail || error.message || 'Login failed. Please check your credentials.';
+      console.error('❌ Login error:', {
+        message: errorMessage,
+        status: error.response?.status,
+        data: error.response?.data,
+        fullError: error
+      });
       set({
-        error: error.response?.data?.detail || 'Login failed',
+        error: errorMessage,
         loading: false,
       });
       return false;

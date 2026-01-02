@@ -1,6 +1,17 @@
 import { io } from 'socket.io-client';
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:8000';
+// Get Socket URL from environment or use default
+let SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:8000';
+
+// Debug: Log the Socket URL being used
+console.log('🔧 Socket URL:', SOCKET_URL);
+console.log('🔧 Environment VITE_SOCKET_URL:', import.meta.env.VITE_SOCKET_URL);
+
+// Validate URL - if it contains placeholder, use default
+if (SOCKET_URL.includes('your-backend-url') || SOCKET_URL.includes('placeholder')) {
+  SOCKET_URL = 'http://localhost:8000';
+  console.log('🔧 Using default Socket URL:', SOCKET_URL);
+}
 
 class SocketService {
   constructor() {
@@ -156,6 +167,12 @@ class SocketService {
   onIncomingCall(callback) {
     if (this.socket) {
       this.socket.on('incoming_call', callback);
+    }
+  }
+
+  onNotification(callback) {
+    if (this.socket) {
+      this.socket.on('notification', callback);
     }
   }
 
