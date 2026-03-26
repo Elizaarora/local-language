@@ -10,16 +10,19 @@ class FirebaseService:
         from ..core.config import settings
         
         if not firebase_admin._apps:
-            # Check if credentials are provided as JSON string (Render/Fly.io secrets)
+            # Check if credentials are provided as JSON string or base64 (Render/Fly.io secrets)
             if settings.FIREBASE_CREDENTIALS_JSON:
-                import json
+                import json, base64
+                raw = settings.FIREBASE_CREDENTIALS_JSON.strip()
+                # Try direct JSON first; fall back to base64 decoding
                 try:
-                    # Try parsing as JSON string
-                    cred_dict = json.loads(settings.FIREBASE_CREDENTIALS_JSON)
-                    cred = credentials.Certificate(cred_dict)
-                except json.JSONDecodeError:
-                    # If it's already a dict (shouldn't happen, but handle it)
-                    cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_JSON)
+                    cred_dict = json.loads(raw)
+                except (json.JSONDecodeError, ValueError):
+                    try:
+                        cred_dict = json.loads(base64.b64decode(raw).decode('utf-8'))
+                    except Exception as e:
+                        raise ValueError(f"FIREBASE_CREDENTIALS must be valid JSON or base64-encoded JSON: {e}")
+                cred = credentials.Certificate(cred_dict)
             else:
                 # Use file path (local development)
                 cred_path = os.path.join(os.path.dirname(__file__), '../../firebase-credentials-local-language.json')
