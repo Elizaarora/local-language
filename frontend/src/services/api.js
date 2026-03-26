@@ -68,6 +68,16 @@ export const authAPI = {
     const response = await api.get(`/auth/user/${userId}`);
     return response.data;
   },
+
+  forgotPassword: async (email) => {
+    const response = await api.post('/auth/forgot-password', { email });
+    return response.data;
+  },
+
+  resetPassword: async (token, new_password) => {
+    const response = await api.post('/auth/reset-password', { token, new_password });
+    return response.data;
+  },
 };
 
 // Chat API

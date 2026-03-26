@@ -1,0 +1,27 @@
+# Render Blueprint Configuration
+# This file allows you to deploy to Render with one click
+
+services:
+  - type: web
+    name: local-language-backend
+    env: python
+    region: oregon  # Change to your preferred region
+    plan: free  # Change to 'starter' for $7/month (no spin-down)
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:socket_app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: PORT
+        value: 10000
+      # Add these via Render dashboard (Environment tab):
+      # JWT_SECRET        — generate with: python -c "import secrets; print(secrets.token_hex(32))"
+      # CORS_ORIGINS      — your Vercel frontend URL e.g. https://your-app.vercel.app
+      # FIREBASE_CREDENTIALS — paste entire service-account JSON as a string
+      # SMTP_USER         — your Gmail address
+      # SMTP_PASS         — Gmail App Password (from myaccount.google.com/apppasswords)
+      # SMTP_FROM         — same Gmail address
+      # FRONTEND_URL      — your Vercel frontend URL e.g. https://your-app.vercel.app
+
+

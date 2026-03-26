@@ -7,10 +7,27 @@ import os
 class FirebaseService:
     def __init__(self):
         # Initialize Firebase Admin
-        cred_path = os.path.join(os.path.dirname(__file__), '../../firebase-credentials-local-language.json')
+        from ..core.config import settings
         
         if not firebase_admin._apps:
-            cred = credentials.Certificate(cred_path)
+            # Check if credentials are provided as JSON string (Render/Fly.io secrets)
+            if settings.FIREBASE_CREDENTIALS_JSON:
+                import json
+                try:
+                    # Try parsing as JSON string
+                    cred_dict = json.loads(settings.FIREBASE_CREDENTIALS_JSON)
+                    cred = credentials.Certificate(cred_dict)
+                except json.JSONDecodeError:
+                    # If it's already a dict (shouldn't happen, but handle it)
+                    cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_JSON)
+            else:
+                # Use file path (local development)
+                cred_path = os.path.join(os.path.dirname(__file__), '../../firebase-credentials-local-language.json')
+                if os.path.exists(cred_path):
+                    cred = credentials.Certificate(cred_path)
+                else:
+                    raise FileNotFoundError(f"Firebase credentials not found at {cred_path}. Please set FIREBASE_CREDENTIALS environment variable.")
+            
             firebase_admin.initialize_app(cred)
         
         self.db = firestore.client()
@@ -152,6 +169,52 @@ class FirebaseService:
         except Exception as e:
             print(f"Error creating notification: {e}")
             return None
+
+    # Password reset token operations
+    async def create_reset_token(self, email: str, token: str, expires_at: datetime) -> bool:
+        try:
+            self.db.collection('password_reset_tokens').document(token).set({
+                'email': email,
+                'token': token,
+                'expires_at': expires_at,
+                'used': False,
+                'created_at': datetime.utcnow(),
+            })
+            return True
+        except Exception as e:
+            print(f"Error creating reset token: {e}")
+            return False
+
+    async def get_reset_token(self, token: str) -> Optional[Dict[str, Any]]:
+        try:
+            doc = self.db.collection('password_reset_tokens').document(token).get()
+            if doc.exists:
+                return doc.to_dict()
+            return None
+        except Exception as e:
+            print(f"Error getting reset token: {e}")
+            return None
+
+    async def mark_reset_token_used(self, token: str) -> bool:
+        try:
+            self.db.collection('password_reset_tokens').document(token).update({'used': True})
+            return True
+        except Exception as e:
+            print(f"Error marking token used: {e}")
+            return False
+
+    async def update_user_password(self, email: str, hashed_password: str) -> bool:
+        try:
+            users_ref = self.db.collection('users')
+            query = users_ref.where('email', '==', email).limit(1)
+            docs = list(query.stream())
+            if not docs:
+                return False
+            docs[0].reference.update({'hashed_password': hashed_password})
+            return True
+        except Exception as e:
+            print(f"Error updating password: {e}")
+            return False
 
 # Create singleton instance
 firebase_service = FirebaseService()

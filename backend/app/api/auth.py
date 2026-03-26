@@ -1,7 +1,13 @@
-from fastapi import APIRouter, HTTPException
+import secrets
+from datetime import datetime, timedelta
+from fastapi import APIRouter, HTTPException, BackgroundTasks
+from pydantic import BaseModel, EmailStr
 from ..models.user import UserCreate, UserLogin, Token
 from ..services.auth_service import auth_service
 from ..services.firebase_service import firebase_service
+from ..services.email_service import send_password_reset_email
+from ..core.security import get_password_hash
+from ..core.config import settings
 from ..core.logging_config import logger
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -102,6 +108,60 @@ async def search_user(email: str):
         "email": user.get('email'),
         "preferred_language": user.get('preferred_language')
     }
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+@router.post("/forgot-password")
+async def forgot_password(data: ForgotPasswordRequest, background_tasks: BackgroundTasks):
+    """Send password reset email. Always returns 200 to avoid leaking whether email exists."""
+    user = await firebase_service.get_user_by_email(data.email)
+    if user:
+        token = secrets.token_urlsafe(32)
+        expires_at = datetime.utcnow() + timedelta(hours=1)
+        await firebase_service.create_reset_token(data.email, token, expires_at)
+        reset_link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
+        background_tasks.add_task(send_password_reset_email, data.email, reset_link)
+    return {"message": "If that email exists, a reset link has been sent."}
+
+@router.post("/reset-password")
+async def reset_password(data: ResetPasswordRequest):
+    """Reset password using a valid token."""
+    if len(data.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+
+    record = await firebase_service.get_reset_token(data.token)
+    if not record:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset link")
+    if record.get("used"):
+        raise HTTPException(status_code=400, detail="This reset link has already been used")
+
+    expires_at = record.get("expires_at")
+    if expires_at:
+        # Firestore stores timestamps as DatetimeWithNanoseconds (timezone-aware).
+        # Plain datetime objects (from tests / direct storage) are naive UTC.
+        if not isinstance(expires_at, datetime):
+            # Non-datetime object with .timestamp() — convert from unix epoch
+            if hasattr(expires_at, "timestamp"):
+                expires_at = datetime.utcfromtimestamp(expires_at.timestamp())
+        elif expires_at.tzinfo is not None:
+            # Timezone-aware datetime (e.g. Firestore) → strip tz for UTC comparison
+            expires_at = expires_at.replace(tzinfo=None)
+        if datetime.utcnow() > expires_at:
+            raise HTTPException(status_code=400, detail="Reset link has expired")
+
+    hashed = get_password_hash(data.new_password)
+    updated = await firebase_service.update_user_password(record["email"], hashed)
+    if not updated:
+        raise HTTPException(status_code=500, detail="Failed to update password")
+
+    await firebase_service.mark_reset_token_used(data.token)
+    logger.info(f"Password reset successful for {record['email']}")
+    return {"message": "Password updated successfully"}
 
 @router.get("/user/{user_id}")
 async def get_user(user_id: str):
