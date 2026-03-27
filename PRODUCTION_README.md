@@ -91,3 +91,4 @@ For issues, check:
 - Docker logs: `docker-compose logs backend`
 - Frontend console: Browser DevTools
 
+

@@ -34,3 +34,4 @@ echo "Press Ctrl+C to stop"
 # Wait for interrupt
 wait $BACKEND_PID
 
+

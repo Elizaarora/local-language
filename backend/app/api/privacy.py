@@ -136,3 +136,4 @@ async def get_privacy_settings(user_id: str):
         logger.error(f"Get privacy settings error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
+

@@ -151,3 +151,4 @@ export function getLanguageColor(lang) {
   return LANGUAGE_COLORS[lowerLang] || 'from-slate-500 to-slate-600';
 }
 
+

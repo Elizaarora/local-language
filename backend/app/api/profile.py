@@ -107,3 +107,4 @@ async def upload_avatar(user_id: str, file: UploadFile = File(...)):
         logger.error(f"Avatar upload error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to upload avatar")
 
+

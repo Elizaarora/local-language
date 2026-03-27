@@ -4,76 +4,209 @@
 @tailwind components;
 @tailwind utilities;
 
-* {
+/* ============================================
+   Global Base
+   ============================================ */
+
+*, *::before, *::after {
+  box-sizing: border-box;
   margin: 0;
   padding: 0;
-  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto',
+    'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
 }
 
-/* Professional Scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
+/* ============================================
+   Professional Custom Scrollbar
+   ============================================ */
 
-::-webkit-scrollbar-track {
-  background: #f1f1f1;
+::-webkit-scrollbar        { width: 6px; height: 6px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  {
+  background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+  border-radius: 999px;
 }
-
-::-webkit-scrollbar-thumb {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 4px;
-}
-
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+  background: linear-gradient(180deg, #764ba2 0%, #667eea 100%);
 }
 
-/* Smooth transitions */
-* {
-  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
-}
+/* Firefox */
+* { scrollbar-width: thin; scrollbar-color: #667eea transparent; }
 
-/* Softer dark mode */
+/* ============================================
+   Dark Mode Base
+   ============================================ */
+
 .dark {
   background-color: #1a1b23;
   color: #e4e4e7;
 }
+.dark .bg-slate-900  { background-color: #1a1b23 !important; }
+.dark .bg-slate-800  { background-color: #242530 !important; }
+.dark .bg-slate-700  { background-color: #2d2e3a !important; }
+.dark .border-slate-700 { border-color: #2d2e3a !important; }
+.dark .text-slate-400   { color: #a1a1aa !important; }
 
-.dark .bg-slate-900 {
-  background-color: #1a1b23 !important;
+/* ============================================
+   Background Color Transition
+   ============================================ */
+
+body,
+.dark,
+header,
+aside,
+main,
+section,
+article,
+div[class*="bg-"] {
+  transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease;
 }
 
-.dark .bg-slate-800 {
-  background-color: #242530 !important;
+/* ============================================
+   Gradient Utilities
+   ============================================ */
+
+.bg-gradient-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+.bg-gradient-vibrant {
+  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%);
+}
+.bg-gradient-hero {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+}
+.bg-gradient-card-blue {
+  background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+}
+.bg-gradient-card-purple {
+  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+}
+.bg-gradient-card-green {
+  background: linear-gradient(135deg, #10b981 0%, #14b8a6 100%);
 }
 
-.dark .bg-slate-700 {
-  background-color: #2d2e3a !important;
+/* ============================================
+   Message Bubbles
+   ============================================ */
+
+.msg-bubble-sender {
+  background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+  color: #fff;
+  border-radius: 20px 20px 4px 20px;
 }
 
-.dark .border-slate-700 {
-  border-color: #2d2e3a !important;
+.msg-bubble-receiver {
+  background: #ffffff;
+  color: #1e293b;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px 20px 20px 4px;
+}
+.dark .msg-bubble-receiver {
+  background: #242530;
+  color: #e4e4e7;
+  border-color: #2d2e3a;
 }
 
-.dark .text-slate-400 {
-  color: #a1a1aa !important;
+/* ============================================
+   Form Input Styles
+   ============================================ */
+
+.form-input {
+  @apply w-full px-4 py-3.5 border-2 border-slate-200 dark:border-[#2d2e3a]
+         dark:bg-[#1a1b23] dark:text-white rounded-xl
+         focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+         transition-all duration-200 text-base placeholder-slate-400;
 }
 
-/* Interactive hover effects */
-.interactive-card {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+.form-label {
+  @apply block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2;
 }
 
-.interactive-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+/* ============================================
+   Card / Surface Utilities
+   ============================================ */
+
+.card {
+  @apply bg-white dark:bg-[#242530] rounded-2xl border border-slate-200
+         dark:border-[#2d2e3a] shadow-sm;
+}
+.card-lg {
+  @apply bg-white dark:bg-[#242530] rounded-3xl border border-slate-200
+         dark:border-[#2d2e3a] shadow-lg;
+}
+
+/* ============================================
+   Status Indicators
+   ============================================ */
+
+.status-online  { background: #22c55e; }
+.status-away    { background: #f59e0b; }
+.status-offline { background: #94a3b8; }
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid white;
+  display: inline-block;
+}
+.dark .status-dot { border-color: #242530; }
+
+/* ============================================
+   Navigation Active State
+   ============================================ */
+
+.nav-active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(102,126,234,.4);
+}
+
+.nav-item {
+  @apply flex items-center gap-3 px-4 py-3 rounded-xl font-medium
+         transition-all duration-200 text-slate-600 dark:text-slate-300
+         hover:bg-slate-100 dark:hover:bg-[#2d2e3a]
+         hover:text-slate-900 dark:hover:text-white;
+}
+
+/* ============================================
+   Badge
+   ============================================ */
+
+.badge {
+  @apply inline-flex items-center justify-center min-w-[20px] h-5 px-1.5
+         text-xs font-bold rounded-full;
+}
+.badge-primary { @apply bg-blue-500 text-white; }
+.badge-danger  { @apply bg-red-500  text-white; }
+.badge-success { @apply bg-green-500 text-white; }
+
+/* ============================================
+   Page wrapper - respects sidebar offset
+   ============================================ */
+
+.page-content {
+  @apply min-h-screen md:ml-64 animate-fade-in;
+}
+
+/* ============================================
+   Prose / Content spacing
+   ============================================ */
+
+.section-heading {
+  @apply text-2xl font-bold dark:text-white tracking-tight;
+}
+.section-sub {
+  @apply text-sm text-slate-500 dark:text-slate-400;
 }

@@ -98,7 +98,20 @@ const useAuthStore = create((set) => ({
   updateUser: (userData) => {
     localStorage.setItem('user', JSON.stringify(userData));
     set({ user: userData });
-  }
+  },
+
+  forgotPassword: async (email) => {
+    set({ loading: true, error: null });
+    try {
+      await authAPI.forgotPassword(email);
+      set({ loading: false });
+      return true;
+    } catch (error) {
+      // Always return true for security (don't reveal if email exists)
+      set({ loading: false });
+      return true;
+    }
+  },
 }));
 
 export default useAuthStore;

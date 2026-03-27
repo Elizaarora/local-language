@@ -50,3 +50,4 @@ if __name__ == "__main__":
     result = asyncio.run(test_login(email, password))
     sys.exit(0 if result else 1)
 
+

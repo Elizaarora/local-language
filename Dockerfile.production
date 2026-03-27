@@ -19,6 +19,9 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy backend code
 COPY backend/ /app/
 
+# Copy Firebase credentials (will be overridden by secrets, but needed for build)
+# Note: Actual credentials should be set via fly secrets
+
 # Create necessary directories
 RUN mkdir -p uploads/avatars logs
 

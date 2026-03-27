@@ -31,3 +31,4 @@ async def test_password(email: str, password: str):
         logger.error(f"Debug password test error: {e}", exc_info=True)
         return {"error": str(e)}
 
+

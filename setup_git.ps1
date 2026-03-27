@@ -81,3 +81,4 @@ if ($remote) {
 Write-Host "`n✅ Git setup complete!" -ForegroundColor Green
 Write-Host "`n📚 See GIT_SETUP.md for detailed instructions" -ForegroundColor Cyan
 
+
