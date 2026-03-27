@@ -1,18 +1,18 @@
 import axios from 'axios';
 
-// Get API URL from environment or use default
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+// Auto-detect production URL — works even when env vars are not set in Vercel
+const IS_LOCAL = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+const PRODUCTION_BACKEND = 'https://local-language-backend.onrender.com';
 
-// Debug: Log the API URL being used
-console.log('🔧 API Base URL:', API_BASE_URL);
-console.log('🔧 Environment VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL);
+function resolveUrl(envVar) {
+  if (envVar && !envVar.includes('your-backend-url') && !envVar.includes('placeholder')) {
+    return envVar;
+  }
+  return IS_LOCAL ? 'http://localhost:8000' : PRODUCTION_BACKEND;
+}
 
-// Validate URL - if it contains placeholder, use default
-const finalApiUrl = API_BASE_URL.includes('your-backend-url') || API_BASE_URL.includes('placeholder') 
-  ? 'http://localhost:8000' 
-  : API_BASE_URL;
-
-console.log('🔧 Final API URL:', finalApiUrl);
+const finalApiUrl = resolveUrl(import.meta.env.VITE_API_BASE_URL);
+console.log('🔧 API URL:', finalApiUrl);
 
 // Create axios instance
 const api = axios.create({
@@ -277,6 +277,13 @@ export const privacyAPI = {
   
   getPrivacySettings: async (userId) => {
     const response = await api.get(`/privacy/settings/${userId}`);
+    return response.data;
+  },
+};
+
+export const contactAPI = {
+  sendMessage: async ({ name, email, message }) => {
+    const response = await api.post('/auth/contact', { name, email, message });
     return response.data;
   },
 };

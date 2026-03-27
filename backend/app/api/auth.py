@@ -5,7 +5,7 @@ from pydantic import BaseModel, EmailStr
 from ..models.user import UserCreate, UserLogin, Token
 from ..services.auth_service import auth_service
 from ..services.firebase_service import firebase_service
-from ..services.email_service import send_password_reset_email
+from ..services.email_service import send_password_reset_email, send_contact_email
 from ..core.security import get_password_hash
 from ..core.config import settings
 from ..core.logging_config import logger
@@ -162,6 +162,19 @@ async def reset_password(data: ResetPasswordRequest):
     await firebase_service.mark_reset_token_used(data.token)
     logger.info(f"Password reset successful for {record['email']}")
     return {"message": "Password updated successfully"}
+
+class ContactRequest(BaseModel):
+    name: str
+    email: EmailStr
+    message: str
+
+@router.post("/contact")
+async def contact_support(data: ContactRequest, background_tasks: BackgroundTasks):
+    """Forward a Help-page contact form message to the admin inbox."""
+    if not data.name.strip() or not data.message.strip():
+        raise HTTPException(status_code=400, detail="Name and message are required")
+    background_tasks.add_task(send_contact_email, data.name.strip(), str(data.email), data.message.strip())
+    return {"message": "Your message has been received. We'll get back to you within 24 hours!"}
 
 @router.get("/user/{user_id}")
 async def get_user(user_id: str):

@@ -1,55 +1,69 @@
 import { io } from 'socket.io-client';
 
-// Get Socket URL from environment or use default
-let SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:8000';
+// Auto-detect production URL — works even when env vars are not set in Vercel
+const IS_LOCAL = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+const PRODUCTION_BACKEND = 'https://local-language-backend.onrender.com';
 
-// Debug: Log the Socket URL being used
-console.log('🔧 Socket URL:', SOCKET_URL);
-console.log('🔧 Environment VITE_SOCKET_URL:', import.meta.env.VITE_SOCKET_URL);
-
-// Validate URL - if it contains placeholder, use default
-if (SOCKET_URL.includes('your-backend-url') || SOCKET_URL.includes('placeholder')) {
-  SOCKET_URL = 'http://localhost:8000';
-  console.log('🔧 Using default Socket URL:', SOCKET_URL);
+function resolveUrl(envVar) {
+  if (envVar && !envVar.includes('your-backend-url') && !envVar.includes('placeholder')) {
+    return envVar;
+  }
+  return IS_LOCAL ? 'http://localhost:8000' : PRODUCTION_BACKEND;
 }
+
+const SOCKET_URL = resolveUrl(import.meta.env.VITE_SOCKET_URL);
+console.log('🔧 Socket URL:', SOCKET_URL);
 
 class SocketService {
   constructor() {
     this.socket = null;
     this.isConnected = false;
+    // stored for auto-rejoin after reconnect
+    this._userId = null;
+    this._conversationId = null;
   }
 
   connect() {
     if (this.socket?.connected) {
-      console.log('Already connected to socket server');
       return this.socket;
     }
 
     console.log('Connecting to socket server:', SOCKET_URL);
-    
+
     this.socket = io(SOCKET_URL, {
       transports: ['websocket', 'polling'],
       reconnection: true,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
     });
 
     this.socket.on('connect', () => {
-      console.log('✅ Connected to server, socket ID:', this.socket.id);
+      console.log('✅ Socket connected:', this.socket.id);
       this.isConnected = true;
     });
 
     this.socket.on('disconnect', (reason) => {
-      console.log('❌ Disconnected from server, reason:', reason);
+      console.log('❌ Socket disconnected:', reason);
       this.isConnected = false;
     });
 
-    this.socket.on('connect_error', (error) => {
-      console.error('Connection error:', error);
+    // On reconnect, re-announce presence and re-join the room
+    this.socket.on('reconnect', () => {
+      console.log('🔄 Socket reconnected — rejoining room');
+      if (this._userId) {
+        this.socket.emit('user_online', { user_id: this._userId });
+      }
+      if (this._conversationId && this._userId) {
+        this.socket.emit('join_conversation', {
+          conversation_id: this._conversationId,
+          user_id: this._userId,
+        });
+      }
     });
 
-    this.socket.on('connection_response', (data) => {
-      console.log('Connection response:', data);
+    this.socket.on('connect_error', (error) => {
+      console.error('Socket connection error:', error.message);
     });
 
     return this.socket;
@@ -57,23 +71,27 @@ class SocketService {
 
   disconnect() {
     if (this.socket) {
+      this._conversationId = null;
+      this._userId = null;
       this.socket.disconnect();
       this.socket = null;
       this.isConnected = false;
-      console.log('Disconnected from socket server');
     }
   }
 
   userOnline(userId) {
-    if (this.socket && this.isConnected) {
-      console.log('Sending user_online:', userId);
+    // Store for reconnect; socket.io buffers the emit until connected
+    this._userId = userId;
+    if (this.socket) {
       this.socket.emit('user_online', { user_id: userId });
     }
   }
 
   joinConversation(conversationId, userId) {
-    if (this.socket && this.isConnected) {
-      console.log('Joining conversation:', conversationId);
+    // Store for reconnect; socket.io buffers the emit until connected
+    this._conversationId = conversationId;
+    this._userId = userId;
+    if (this.socket) {
       this.socket.emit('join_conversation', {
         conversation_id: conversationId,
         user_id: userId,
@@ -82,8 +100,8 @@ class SocketService {
   }
 
   leaveConversation(conversationId, userId) {
-    if (this.socket && this.isConnected) {
-      console.log('Leaving conversation:', conversationId);
+    this._conversationId = null;
+    if (this.socket) {
       this.socket.emit('leave_conversation', {
         conversation_id: conversationId,
         user_id: userId,
